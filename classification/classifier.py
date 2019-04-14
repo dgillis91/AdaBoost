@@ -2,6 +2,10 @@ import numpy as np
 from util import tree_log, mid_point
 
 
+class HomogeneousClassError(Exception):
+    pass
+
+
 # TODO: Do we need to update the split rules? For example, using majority votes from the parent.
 # TODO: Write doc strings.
 class Node:
@@ -119,6 +123,8 @@ class RootNode(Node):
         :return: the split which minimizes the impurity, as measured by entropy.
         """
         potential_splits = self.find_delta_indices()
+        if len(potential_splits) == 0:
+            raise HomogeneousClassError
         gain = -1
         for potential_split in potential_splits:
             data_left, data_right = self.make_nodes(potential_split)
