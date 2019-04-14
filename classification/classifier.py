@@ -4,10 +4,8 @@ from util import tree_log, mid_point
 
 # TODO: Do we need to update the split rules? For example, using majority votes from the parent.
 # TODO: Write doc strings.
-# TODO: Add assertions for data shape.
 class Node:
     def __init__(self, predictors, targets, classes=np.array([-1, 1])):
-        # TODO: Data has to be sorted.
         assert len(predictors) == len(targets)
         self.predictors = np.copy(predictors)
         self.targets = np.copy(targets)
