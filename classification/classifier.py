@@ -1,5 +1,5 @@
 import numpy as np
-from . util import tree_log, mid_point
+from util import tree_log, mid_point
 
 
 # TODO: Do we need to update the split rules? For example, using majority votes from the parent.
@@ -7,9 +7,11 @@ from . util import tree_log, mid_point
 # TODO: Add assertions for data shape.
 class Node:
     def __init__(self, predictors, targets, classes=np.array([-1, 1])):
+        # TODO: Data has to be sorted.
         assert len(predictors) == len(targets)
         self.predictors = np.copy(predictors)
         self.targets = np.copy(targets)
+        self._sort_data_inplace()
         self.classes = classes
         self._class_counts = self._get_class_counts()
         self._majority_vote = self._compute_majority_class_count()
@@ -32,6 +34,11 @@ class Node:
     @property
     def majority_vote(self):
         return self._majority_vote
+
+    def _sort_data_inplace(self):
+        sorted_indices = np.argsort(self.predictors)
+        self.predictors = self.predictors[sorted_indices]
+        self.targets = self.targets[sorted_indices]
 
     def _get_class_counts(self):
         """
