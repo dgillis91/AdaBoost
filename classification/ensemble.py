@@ -5,7 +5,7 @@ import math
 
 
 # TODO: Step through code.
-# TODO: Add the verbose requirement from the project text. 
+# TODO: Add the verbose requirement from the project text.
 class AdaBoostClassifier:
     def __init__(self, predictors, targets, boosting_rounds=10):
         self._sample_count = len(targets)
