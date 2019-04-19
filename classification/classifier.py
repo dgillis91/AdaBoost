@@ -1,9 +1,138 @@
 import numpy as np
 from util import tree_log, mid_point
+from typing import TypeVar, Iterable, Tuple, List, Dict
+
+Predictable = TypeVar('Predictable', float, Iterable, np.ndarray)
+
+"""
+Description:    
+    We are asked to create a decision stump. From the text:
+    Let x denote a a one-dimensional attribute and y denote
+    the class label. Suppose we use only one-level binary 
+    decision trees, with a test condition x <= k, where k
+    is a split position chosen to minimize the entropy of
+    the leaf nodes.
+    
+    Based on this specification, we will not compute
+    information gain. Instead, we just compute the entropy
+    of the children.
+    
+Assumptions:
+    (1) The data we will test on is continuous. As such, we
+        choose to split the data using entropy. This is 
+        described in the algorithm, below. 
+    (2) Assume binary target.
+    (3) Integer targets in range [-1, 1].
+    
+Decision Stump Algorithm:
+    (1) Sort the targets by their inputs.
+    (2) Find the indices where the target changes.
+    (3) For each target change index:
+    (4)     Compute the midpoint of the index, and its predecessor.
+    (5)     Compute the entropy of that split.
+"""
 
 
 class HomogeneousClassError(Exception):
     pass
+
+
+def sort_data(predictors: np.ndarray, targets: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    assert predictors.shape[0] == targets.shape[0]
+    sorted_indices = np.argsort(predictors)
+    return predictors[sorted_indices], targets[sorted_indices]
+
+
+def find_delta_indices(targets: np.ndarray) -> List[int]:
+    indices = []
+    for i in range(1, targets.shape[0]):
+        if targets[i] != targets[i - 1]:
+            indices.append(i)
+    return indices
+
+
+def test_split(targets: np.ndarray, index: int) -> Tuple[np.ndarray, np.ndarray]:
+    return (
+        targets[0:index], targets[index:len(targets)]
+    )
+
+
+def class_counts(targets: np.ndarray) -> Dict[int, int]:
+    counts = {}
+    for key, value in np.unique(targets, return_counts=True):
+        counts[key] = value
+    return counts
+
+
+class StumpClassifier:
+    _target_range = [-1, 1]
+
+    def __init__(self):
+        self._decision_boundary = None
+        self._predictors, self._targets = [None] * 2
+        self._left_prediction, self._right_prediction = [None] * 2
+        self._impurity = 1.0
+
+    @property
+    def decision_boundary(self) -> float:
+        return self._decision_boundary
+
+    @property
+    def impurity(self) -> float:
+        return self._impurity
+
+    def fit(self, predictors: np.ndarray, targets: np.ndarray) -> None:
+        self._predictors = np.copy(predictors)
+        self._targets = np.copy(targets)
+        self._predictors, self._targets = sort_data(self._predictors, self._targets)
+        self._decision_boundary = self._find_best_split(self._predictors, self._targets)
+
+    def predict(self, predictors: Predictable) -> np.ndarray:
+        try:
+            _ = iter(predictors)
+        except TypeError:
+            predictors = [predictors]
+
+        return np.array(
+            [self._predict_single(predictor) for predictor in predictors]
+        )
+
+    def _predict_single(self, predictor: float) -> int:
+        prediction = None
+        if predictor <= self.decision_boundary:
+            prediction = self._left_prediction
+        else:
+            prediction = self._right_prediction
+        return prediction
+
+    def _find_best_split(self, predictors: np.ndarray, targets: np.ndarray) -> float:
+        delta_indices = find_delta_indices(targets)
+        if len(delta_indices) == 0:
+            raise HomogeneousClassError()
+        best_index, best_entropy = -1, -1
+        for index in delta_indices:
+            left_data, right_data = test_split(targets, index)
+            # TODO: Implement
+
+    @staticmethod
+    def _info(self, left_data: np.ndarray, right_data: np.ndarray) -> float:
+        # TODO: Implement
+        pass
+
+    @staticmethod
+    def _entropy(self, left_data, right_data) -> float:
+        # TODO: Implement
+        pass
+
+    def __repr__(self):
+        def stringify_array(a):
+            return [str(x) for x in a]
+
+        return 'decision_boundary: {}\nPred: {}\nTarg: {}'.format(
+            self.decision_boundary,
+            '|'.join(stringify_array(self._targets)),
+            '|'.join(stringify_array(self._predictors))
+        )
 
 
 # TODO: Do we need to update the split rules? For example, using majority votes from the parent.
@@ -204,11 +333,12 @@ class DecisionStump(RootNode):
 
 
 if __name__ == '__main__':
-    s = DecisionStump(
-            np.array([.5, 3.0, 4.5, 4.6, 4.9, 5.2, 5.3, 5.5, 7.0, 9.5]),
-            np.array([-1, -1, 1, 1, 1, -1, -1, 1, -1, -1])
-    )
-
-    s.fit()
-    print(s.predict(5))
-    print(s.decision_boundary)
+    #s = DecisionStump(
+    #        np.array([.5, 3.0, 4.5, 4.6, 4.9, 5.2, 5.3, 5.5, 7.0, 9.5]),
+    #        np.array([-1, -1, 1, 1, 1, -1, -1, 1, -1, -1])
+    #)
+    #
+    #s.fit()
+    #print(s.predict(5))
+    #print(s.decision_boundary)
+    print(find_delta_indices(np.array([1, 1, 1, -1])))
