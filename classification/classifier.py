@@ -165,9 +165,13 @@ class StumpClassifier:
 
 if __name__ == '__main__':
     c = StumpClassifier()
-    pred = np.arange(1, 11) / 10
-    targets = np.array([1, 1, 1, -1, -1, -1, -1, 1, 1, 1])
-    print(pred.shape)
-    print(targets.shape)
+    # pred = np.arange(1, 11) / 10
+    # targets = np.array([1, 1, 1, -1, -1, -1, -1, 1, 1, 1])
+    # print(pred.shape)
+    # print(targets.shape)
+    # pred = np.array([0.1, .2, .2, .3, .4, .4, .5, .6, .9, .9])
+    # targets = np.array([1, 1, 1, 1, -1, -1, -1, -1, 1, 1])
+    pred = np.array([.1, .2, .3, .4, .5, .8, .9, 1, 1, 1])
+    targets = np.array([1, 1, 1, -1, -1, 1, 1, 1, 1, 1])
     c.fit(pred, targets)
     print(c)
