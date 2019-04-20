@@ -1,7 +1,7 @@
 import numpy as np
 from util import tree_log, mid_point
 from typing import TypeVar, Iterable, Tuple, List, Dict
-from . localtypes import Predictable
+from localtypes import Predictable
 
 
 """
@@ -56,7 +56,7 @@ def find_delta_indices(targets: np.ndarray) -> List[int]:
 
 def test_split(data: np.ndarray, index: int) -> Tuple[np.ndarray, np.ndarray]:
     return (
-        data[0:index], data[index:len(targets)]
+        data[0:index], data[index:len(data)]
     )
 
 
