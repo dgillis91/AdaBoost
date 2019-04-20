@@ -1,8 +1,27 @@
 import numpy as np
 from classifier import DecisionStump, HomogeneousClassError
+from . classifier import StumpClassifier
 from metrics import accuracy_score
+from . localtypes import Predictable
 import math
 
+
+class AdaBosst:
+    def __init__(self, boosting_rounds=10):
+        self.boosting_rounds = boosting_rounds
+        self.ensemble = []
+        self.alphas = []
+
+    @staticmethod
+    def uniform_probability_list(n_samples):
+        sample_weight = 1 / n_samples
+        return np.array([sample_weight] * n_samples)
+
+    def fit(self, predictors, targets):
+        pass
+
+    def predict(self, predictors: np.ndarray) -> np.ndarray:
+        pass
 
 # TODO: Step through code.
 # TODO: Add the verbose requirement from the project text.

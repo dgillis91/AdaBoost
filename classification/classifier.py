@@ -1,8 +1,8 @@
 import numpy as np
 from util import tree_log, mid_point
 from typing import TypeVar, Iterable, Tuple, List, Dict
+from . localtypes import Predictable
 
-Predictable = TypeVar('Predictable', float, Iterable, np.ndarray)
 
 """
 Description:    
