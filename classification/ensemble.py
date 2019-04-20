@@ -115,7 +115,7 @@ class AdaBoost:
 if __name__ == '__main__':
     predictors = np.array([.5, 3.0, 4.5, 4.6, 4.9, 5.2, 5.3, 5.5, 7.0, 9.5])
     targets = np.array([-1, -1, 1, 1, 1, -1, -1, 1, -1, -1])
-    classifier = AdaBoost(15)
+    classifier = AdaBoost(10)
     classifier.fit(predictors, targets, verbose=True)
     # print(classifier.predict(predictors))
     test = np.arange(1, 11) * 1.0
