@@ -23,7 +23,10 @@ Assumptions:
         described in the algorithm, below. 
     (2) Assume binary target.
     (3) Integer targets in range [-1, 1].
-    
+    (4) When finding the best split, if there are two splits
+        resulting in equal information gain, the second is
+        chosen. This is arbitrary, and would need adjustment.
+        
 Decision Stump Algorithm:
     (1) Sort the targets by their inputs.
     (2) Find the indices where the target changes.
@@ -51,17 +54,24 @@ def find_delta_indices(targets: np.ndarray) -> List[int]:
     return indices
 
 
-def test_split(targets: np.ndarray, index: int) -> Tuple[np.ndarray, np.ndarray]:
+def test_split(data: np.ndarray, index: int) -> Tuple[np.ndarray, np.ndarray]:
     return (
-        targets[0:index], targets[index:len(targets)]
+        data[0:index], data[index:len(targets)]
     )
 
 
-def class_counts(targets: np.ndarray) -> Dict[int, int]:
+def class_counts(data: np.ndarray) -> Dict:
     counts = {}
-    for key, value in np.unique(targets, return_counts=True):
+    keys, values = np.unique(data, return_counts=True)
+    for key, value in zip(keys, values):
         counts[key] = value
     return counts
+
+
+def majority_class(data: np.ndarray) -> int:
+    classes, counts = np.unique(data, return_counts=True)
+    max_index = np.argmax(counts)
+    return classes[max_index]
 
 
 class StumpClassifier:
@@ -71,21 +81,21 @@ class StumpClassifier:
         self._decision_boundary = None
         self._predictors, self._targets = [None] * 2
         self._left_prediction, self._right_prediction = [None] * 2
-        self._impurity = 1.0
+        self._information = 1.0
 
     @property
     def decision_boundary(self) -> float:
         return self._decision_boundary
 
     @property
-    def impurity(self) -> float:
-        return self._impurity
+    def information(self) -> float:
+        return self._information
 
     def fit(self, predictors: np.ndarray, targets: np.ndarray) -> None:
         self._predictors = np.copy(predictors)
         self._targets = np.copy(targets)
         self._predictors, self._targets = sort_data(self._predictors, self._targets)
-        self._decision_boundary = self._find_best_split(self._predictors, self._targets)
+        self._find_best_split(self._predictors, self._targets)
 
     def predict(self, predictors: Predictable) -> np.ndarray:
         try:
@@ -105,24 +115,42 @@ class StumpClassifier:
             prediction = self._right_prediction
         return prediction
 
-    def _find_best_split(self, predictors: np.ndarray, targets: np.ndarray) -> float:
+    def _find_best_split(self, predictors: np.ndarray, targets: np.ndarray) -> Tuple[float, float]:
         delta_indices = find_delta_indices(targets)
         if len(delta_indices) == 0:
             raise HomogeneousClassError()
-        best_index, best_entropy = -1, -1
+        best_index, best_info = -1, -1
         for index in delta_indices:
             left_data, right_data = test_split(targets, index)
-            # TODO: Implement
+            info = self._info(left_data, right_data)
+            if info >= best_info:
+                best_index = index
+                best_info = info
+        self._set_model_params(best_index, best_info)
 
-    @staticmethod
     def _info(self, left_data: np.ndarray, right_data: np.ndarray) -> float:
-        # TODO: Implement
-        pass
+        total = len(self._targets)
+        left_len, right_len = len(left_data), len(right_data)
+        left_p, right_p = left_len / total, right_len / total
+        parent_entropy = self._entropy(self._targets)
+        return (
+            parent_entropy - (left_p * self._entropy(left_data) + right_p * self._entropy(right_data))
+        )
 
-    @staticmethod
-    def _entropy(self, left_data, right_data) -> float:
-        # TODO: Implement
-        pass
+    def _entropy(self, data: np.ndarray) -> float:
+        sigma = 0
+        total = len(data)
+        for target, target_count in class_counts(data).items():
+            p = target_count / total
+            sigma += -(p * tree_log(p))
+        return sigma
+
+    def _set_model_params(self, index: int, info_gain: float) -> None:
+        self._decision_boundary = mid_point(self._predictors[index - 1], self._predictors[index])
+        self._information = info_gain
+        left_data, right_data = test_split(self._targets, index)
+        self._left_prediction = majority_class(left_data)
+        self._right_prediction = majority_class(right_data)
 
     def __repr__(self):
         def stringify_array(a):
@@ -130,8 +158,8 @@ class StumpClassifier:
 
         return 'decision_boundary: {}\nPred: {}\nTarg: {}'.format(
             self.decision_boundary,
-            '|'.join(stringify_array(self._targets)),
-            '|'.join(stringify_array(self._predictors))
+            '|'.join(stringify_array(self._predictors)),
+            '|'.join(stringify_array(self._targets))
         )
 
 
@@ -333,12 +361,10 @@ class DecisionStump(RootNode):
 
 
 if __name__ == '__main__':
-    #s = DecisionStump(
-    #        np.array([.5, 3.0, 4.5, 4.6, 4.9, 5.2, 5.3, 5.5, 7.0, 9.5]),
-    #        np.array([-1, -1, 1, 1, 1, -1, -1, 1, -1, -1])
-    #)
-    #
-    #s.fit()
-    #print(s.predict(5))
-    #print(s.decision_boundary)
-    print(find_delta_indices(np.array([1, 1, 1, -1])))
+    c = StumpClassifier()
+    pred = np.arange(1, 11) / 10
+    targets = np.array([1, 1, 1, -1, -1, -1, -1, 1, 1, 1])
+    print(pred.shape)
+    print(targets.shape)
+    c.fit(pred, targets)
+    print(c)
