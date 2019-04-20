@@ -1,0 +1,328 @@
+<html>
+<head>
+<title>adaboost_project.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #000080; font-weight: bold;}
+.s1 { color: #000000;}
+.s2 { color: #008080; font-weight: bold;}
+.s3 { color: #808080; font-style: italic;}
+.s4 { color: #0000ff;}
+</style>
+</head>
+<body bgcolor="#ffffff">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#c0c0c0" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+adaboost_project.py</font>
+</center></td></tr></table>
+<pre><span class="s0">import </span>numpy <span class="s0">as </span>np
+<span class="s0">from </span>typing <span class="s0">import </span>TypeVar, Iterable, Tuple, List, Dict
+<span class="s0">from </span>typing <span class="s0">import </span>Tuple
+<span class="s0">import </span>math
+
+
+<span class="s2">&quot;&quot;&quot; 
+Description:     
+    We are asked to create a decision stump. From the text: 
+    Let x denote a a one-dimensional attribute and y denote 
+    the class label. Suppose we use only one-level binary  
+    decision trees, with a test condition x &lt;= k, where k 
+    is a split position chosen to minimize the entropy of 
+    the leaf nodes. 
+ 
+    Based on this specification, we will not compute 
+    information gain. Instead, we just compute the entropy 
+    of the children. 
+ 
+Assumptions: 
+    (1) The data we will test on is continuous. As such, we 
+        choose to split the data using entropy. This is  
+        described in the algorithm, below.  
+    (2) Assume binary target. 
+    (3) Integer targets in range [-1, 1]. 
+    (4) When finding the best split, if there are two splits 
+        resulting in equal information gain, the second is 
+        chosen. This is arbitrary, and would need adjustment. 
+ 
+Decision Stump Algorithm: 
+    (1) Sort the targets by their inputs. 
+    (2) Find the indices where the target changes. 
+    (3) For each target change index: 
+    (4)     Compute the midpoint of the index, and its predecessor. 
+    (5)     Compute the entropy of that split. 
+&quot;&quot;&quot;</span>
+
+Predictable = TypeVar(<span class="s2">'Predictable'</span>, float, Iterable, np.ndarray)
+
+
+<span class="s0">def </span>mid_point(val_one, val_two):
+    <span class="s3">&quot;&quot;&quot; 
+    :param val_one: lower bound 
+    :param val_two: upper bound 
+    :return: the mid point of two bounds 
+    &quot;&quot;&quot;</span>
+    <span class="s0">return </span>(val_one*<span class="s4">1.0 </span>+ val_two*<span class="s4">1.0</span>) / <span class="s4">2.0</span>
+
+
+<span class="s0">def </span>tree_log(val):
+    <span class="s3">&quot;&quot;&quot; 
+    Customized log for building decision trees. 
+    :param val: The value to take the log of. 
+    :return: If val is 0, 0 is returned. Else, log2(val). 
+    &quot;&quot;&quot;</span>
+    <span class="s0">if </span>val == <span class="s4">0</span>:
+        <span class="s0">return </span><span class="s4">0</span>
+    <span class="s0">else</span>:
+        <span class="s0">return </span>math.log2(val)
+
+
+<span class="s0">class </span>HomogeneousClassError(Exception):
+    <span class="s0">pass</span>
+
+
+def sort_data(predictors: np.ndarray, targets: np.ndarray) -&gt; Tuple[np.ndarray, np.ndarray]:
+    <span class="s0">assert </span>predictors.shape[<span class="s4">0</span>] == targets.shape[<span class="s4">0</span>]
+    sorted_indices = np.argsort(predictors)
+    <span class="s0">return </span>predictors[sorted_indices], targets[sorted_indices]
+
+
+<span class="s0">def </span>find_delta_indices(targets: np.ndarray) -&gt; List[int]:
+    indices = []
+    <span class="s0">for </span>i <span class="s0">in </span>range(<span class="s4">1</span>, targets.shape[<span class="s4">0</span>]):
+        <span class="s0">if </span>targets[i] != targets[i - <span class="s4">1</span>]:
+            indices.append(i)
+    <span class="s0">return </span>indices
+
+
+<span class="s0">def </span>test_split(data: np.ndarray, index: int) -&gt; Tuple[np.ndarray, np.ndarray]:
+    <span class="s0">return </span>(
+        data[<span class="s4">0</span>:index], data[index:len(data)]
+    )
+
+
+<span class="s0">def </span>class_counts(data: np.ndarray) -&gt; Dict:
+    counts = {}
+    keys, values = np.unique(data, return_counts=<span class="s0">True</span>)
+    <span class="s0">for </span>key, value <span class="s0">in </span>zip(keys, values):
+        counts[key] = value
+    <span class="s0">return </span>counts
+
+
+<span class="s0">def </span>majority_class(data: np.ndarray) -&gt; int:
+    classes, counts = np.unique(data, return_counts=<span class="s0">True</span>)
+    max_index = np.argmax(counts)
+    <span class="s0">return </span>classes[max_index]
+
+
+<span class="s0">class </span>StumpClassifier:
+    _target_range = [-<span class="s4">1</span>, <span class="s4">1</span>]
+
+    <span class="s0">def </span>__init__(self):
+        self._decision_boundary = <span class="s0">None</span>
+        self._predictors, self._targets = [<span class="s0">None</span>] * <span class="s4">2</span>
+        self._left_prediction, self._right_prediction = [<span class="s0">None</span>] * <span class="s4">2</span>
+        self._information = <span class="s4">1.0</span>
+
+    @property
+    <span class="s0">def </span>decision_boundary(self) -&gt; float:
+        <span class="s0">return </span>self._decision_boundary
+
+    @property
+    <span class="s0">def </span>information(self) -&gt; float:
+        <span class="s0">return </span>self._information
+
+    <span class="s0">def </span>fit(self, predictors: np.ndarray, targets: np.ndarray) -&gt; <span class="s0">None</span>:
+        self._predictors = np.copy(predictors)
+        self._targets = np.copy(targets)
+        self._predictors, self._targets = sort_data(self._predictors, self._targets)
+        self._find_best_split(self._predictors, self._targets)
+
+    <span class="s0">def </span>predict(self, predictors: Predictable) -&gt; np.ndarray:
+        <span class="s0">try</span>:
+            _ = iter(predictors)
+        <span class="s0">except </span>TypeError:
+            predictors = [predictors]
+
+        <span class="s0">return </span>np.array(
+            [self._predict_single(predictor) <span class="s0">for </span>predictor <span class="s0">in </span>predictors]
+        )
+
+    <span class="s0">def </span>_predict_single(self, predictor: float) -&gt; int:
+        prediction = <span class="s0">None</span>
+        if predictor &lt;= self.decision_boundary:
+            prediction = self._left_prediction
+        <span class="s0">else</span>:
+            prediction = self._right_prediction
+        <span class="s0">return </span>prediction
+
+    <span class="s0">def </span>_find_best_split(self, predictors: np.ndarray, targets: np.ndarray) -&gt; Tuple[float, float]:
+        delta_indices = find_delta_indices(targets)
+        <span class="s0">if </span>len(delta_indices) == <span class="s4">0</span>:
+            <span class="s0">raise </span>HomogeneousClassError()
+        best_index, best_info = -<span class="s4">1</span>, -<span class="s4">1</span>
+        <span class="s0">for </span>index <span class="s0">in </span>delta_indices:
+            left_data, right_data = test_split(targets, index)
+            info = self._info(left_data, right_data)
+            <span class="s0">if </span>info &gt;= best_info:
+                best_index = index
+                best_info = info
+        self._set_model_params(best_index, best_info)
+
+    <span class="s0">def </span>_info(self, left_data: np.ndarray, right_data: np.ndarray) -&gt; float:
+        total = len(self._targets)
+        left_len, right_len = len(left_data), len(right_data)
+        left_p, right_p = left_len / total, right_len / total
+        parent_entropy = self._entropy(self._targets)
+        <span class="s0">return </span>(
+                parent_entropy - (left_p * self._entropy(left_data) + right_p * self._entropy(right_data))
+        )
+
+    <span class="s0">def </span>_entropy(self, data: np.ndarray) -&gt; float:
+        sigma = <span class="s4">0</span>
+        total = len(data)
+        <span class="s0">for </span>target, target_count <span class="s0">in </span>class_counts(data).items():
+            p = target_count / total
+            sigma += -(p * tree_log(p))
+        <span class="s0">return </span>sigma
+
+    <span class="s0">def </span>_set_model_params(self, index: int, info_gain: float) -&gt; <span class="s0">None</span>:
+        self._decision_boundary = mid_point(self._predictors[index - <span class="s4">1</span>], self._predictors[index])
+        self._information = info_gain
+        left_data, right_data = test_split(self._targets, index)
+        self._left_prediction = majority_class(left_data)
+        self._right_prediction = majority_class(right_data)
+
+    <span class="s0">def </span>__repr__(self):
+        <span class="s0">def </span>stringify_array(a):
+            <span class="s0">return </span>[str(x) <span class="s0">for </span>x <span class="s0">in </span>a]
+
+        <span class="s0">return </span><span class="s2">'decision_boundary: {}</span><span class="s0">\n</span><span class="s2">Pred: {}</span><span class="s0">\n</span><span class="s2">Targ: {}'</span>.format(
+            self.decision_boundary,
+            <span class="s2">'|'</span>.join(stringify_array(self._predictors)),
+            <span class="s2">'|'</span>.join(stringify_array(self._targets))
+        )
+
+
+<span class="s0">class </span>AdaBoost:
+    <span class="s0">def </span>__init__(self, boosting_rounds=<span class="s4">10</span>):
+        self._predictors, self._targets, self._sample_indices = [<span class="s0">None</span>] * <span class="s4">3</span>
+        self.boosting_rounds = boosting_rounds
+        self.ensemble = []
+        self.alphas = []
+
+    @staticmethod
+    <span class="s0">def </span>uniform_probability_list(n_samples):
+        sample_weight = <span class="s4">1 </span>/ n_samples
+        <span class="s0">return </span>np.array([sample_weight] * n_samples)
+
+    <span class="s0">def </span>fit(self, predictors: np.ndarray, targets: np.ndarray, verbose = <span class="s0">True</span>) -&gt; <span class="s0">None</span>:
+        self._initialize_data(predictors, targets)
+        sample_weights = AdaBoost.uniform_probability_list(len(self._targets))
+        boosting_round = <span class="s4">0</span>
+        <span class="s0">while </span>boosting_round &lt; self.boosting_rounds:
+            sample_predictors, sample_targets = self._get_sample(sample_weights)
+            stump = StumpClassifier()
+            <span class="s0">try</span>:
+                stump.fit(sample_predictors, sample_targets)
+            <span class="s0">except </span>HomogeneousClassError:
+                sample_weights = AdaBoost.uniform_probability_list(len(self._targets))
+                <span class="s0">continue</span>
+            predictions = stump.predict(self._predictors)
+            misclassed = self._misclassed_predictions(predictions)
+            weighted_error = self._weighted_error(misclassed, sample_weights)
+            <span class="s0">if </span>weighted_error &gt;= <span class="s4">.5</span>:
+                sample_weights = self.uniform_probability_list(len(self._targets))
+                <span class="s0">continue</span>
+            else:
+                boosting_round += <span class="s4">1</span>
+                alpha = <span class="s4">.5 </span>* math.log((<span class="s4">1 </span>- weighted_error) / weighted_error)
+                self._add_model(stump, alpha)
+                <span class="s0">if </span>verbose:
+                    <span class="s0">def </span>print_div():
+                        print(<span class="s2">'----------------------------------------'</span>)
+
+                    <span class="s0">def </span>stringify_array(a):
+                        <span class="s0">return </span>[str(x) <span class="s0">for </span>x <span class="s0">in </span>a]
+                    print_div()
+                    print(
+                        <span class="s2">'Alpha: {}</span><span class="s0">\n</span><span class="s2">Error: {}'</span>.format(
+                            alpha, weighted_error
+                        )
+                    )
+                    print(<span class="s2">'Weights:'</span>)
+                    print(
+                        <span class="s2">'|'</span>.join(stringify_array(sample_weights))
+                    )
+                    print(stump)
+                    print_div()
+                sample_weights = self._update_weights(sample_weights, misclassed, alpha)
+
+    <span class="s0">def </span>predict(self, values):
+        <span class="s0">try</span>:
+            _ = iter(values)
+        <span class="s0">except </span>TypeError:
+            values = [values]
+        predictions = []
+        <span class="s0">for </span>value <span class="s0">in </span>values:
+            predictions.append(self._majority_vote(value))
+        <span class="s0">return </span>np.array(predictions)
+
+    <span class="s0">def </span>_majority_vote(self, value):
+        sigma = <span class="s4">0</span>
+        <span class="s0">for </span>alpha, model <span class="s0">in </span>zip(self.alphas, self.ensemble):
+            sigma += (alpha * model.predict(value)[<span class="s4">0</span>])
+        <span class="s0">if </span>sigma &lt; <span class="s4">0</span>:
+            <span class="s0">return </span>-<span class="s4">1</span>
+        <span class="s0">else</span>:
+            <span class="s0">return </span><span class="s4">1</span>
+
+    <span class="s0">def </span>_initialize_data(self, predictors: np.ndarray, targets: np.ndarray) -&gt; <span class="s0">None</span>:
+        self._predictors = np.copy(predictors)
+        self._targets = np.copy(targets)
+        self._sample_indices = list(range(len(targets)))
+
+    <span class="s0">def </span>_get_sample(self, probabilities: np.ndarray) -&gt; Tuple[np.ndarray, np.ndarray]:
+        random_indices = np.random.choice(self._sample_indices, size=len(self._targets), replace=<span class="s0">True</span>, p=probabilities)
+        <span class="s0">return </span>self._predictors[random_indices], self._targets[random_indices]
+
+    <span class="s0">def </span>_misclassed_predictions(self, predictions):
+        <span class="s0">return </span>self._targets != predictions
+
+    @staticmethod
+    <span class="s0">def </span>_weighted_error(misclassed_selectors: np.ndarray, sample_weights: np.ndarray):
+        misclassed_bitmap = misclassed_selectors.astype(np.int)
+        <span class="s0">return </span>np.dot(sample_weights, misclassed_bitmap)
+
+    <span class="s0">def </span>_add_model(self, model, alpha):
+        self.ensemble.append(model)
+        self.alphas.append(alpha)
+
+    <span class="s0">def </span>_update_weights(self, weights, misclassed, alpha):
+        new_weights = []
+        <span class="s0">for </span>is_misclassed, weight <span class="s0">in </span>zip(misclassed, weights):
+            <span class="s0">if </span>is_misclassed:
+                a_exp = -alpha
+            <span class="s0">else</span>:
+                a_exp = alpha
+            new_weights.append(weight * math.exp(a_exp))
+        new_weights = np.array(new_weights)
+        new_weights /= new_weights.sum()
+        <span class="s0">return </span>new_weights
+
+
+<span class="s0">if </span>__name__ == <span class="s2">'__main__'</span>:
+    predictors = np.array([<span class="s4">.5</span>, <span class="s4">3.0</span>, <span class="s4">4.5</span>, <span class="s4">4.6</span>, <span class="s4">4.9</span>, <span class="s4">5.2</span>, <span class="s4">5.3</span>, <span class="s4">5.5</span>, <span class="s4">7.0</span>, <span class="s4">9.5</span>])
+    targets = np.array([-<span class="s4">1</span>, -<span class="s4">1</span>, <span class="s4">1</span>, <span class="s4">1</span>, <span class="s4">1</span>, -<span class="s4">1</span>, -<span class="s4">1</span>, <span class="s4">1</span>, -<span class="s4">1</span>, -<span class="s4">1</span>])
+    classifier = AdaBoost(<span class="s4">10</span>)
+    classifier.fit(predictors, targets, verbose=<span class="s0">True</span>)
+    <span class="s3"># print(classifier.predict(predictors))</span>
+    test = np.arange(<span class="s4">1</span>, <span class="s4">11</span>) * <span class="s4">1.0</span>
+    print(<span class="s2">'Test Data:'</span>)
+    print(test)
+    print(<span class="s2">'Test Predictions:'</span>)
+    print(classifier.predict(test))
+
+</pre>
+</body>
+</html>
